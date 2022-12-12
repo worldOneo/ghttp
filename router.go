@@ -5,7 +5,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/evanphx/wildcat"
 	"github.com/panjf2000/gnet/v2"
 )
 
@@ -37,21 +36,6 @@ type HandlerFunc = func(req Request, res *Response) error
 type Router struct {
 	routes routerRoot
 }
-
-// HTTP Methods
-const (
-	MethodGet = iota
-	MethodHead
-	MethodPost
-	MethodPut
-	MethodPatch
-	MethodDelete
-	MethodConnect
-	MethodOptions
-	MethodTrace
-	MethodUnkown
-	methodCount
-)
 
 // NewRouter creates a new router
 func NewRouter() *Router {
@@ -111,7 +95,7 @@ func (router *Router) findRoute(r Request, path []byte) HandlerFunc {
 
 var signalPool = sync.Pool{New: func() any { return new(bool) }}
 
-func (router *Router) call(conn gnet.Conn, p *wildcat.HTTPParser, body []byte) bool {
+func (router *Router) call(conn gnet.Conn, p *httpParser, body []byte) bool {
 	response := getResponse()
 
 	request := Request{
@@ -122,7 +106,7 @@ func (router *Router) call(conn gnet.Conn, p *wildcat.HTTPParser, body []byte) b
 		response: response,
 	}
 
-	handler := router.findRoute(request, p.Path)
+	handler := router.findRoute(request, p.path)
 	hc := conn.Context().(*httpCodec)
 
 	if handler == nil {

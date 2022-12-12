@@ -3,7 +3,6 @@ package ghttp
 import (
 	"bytes"
 
-	"github.com/evanphx/wildcat"
 	"github.com/panjf2000/gnet/v2"
 )
 
@@ -15,11 +14,11 @@ import (
 // or use HandleBlocking to do blocking
 // tasks like DB operations to avoid blocking the I/O loop.
 type Request struct {
-	conn     gnet.Conn
-	parser   *wildcat.HTTPParser
-	data     []byte
-	detached *bool
-	response *Response
+	conn      gnet.Conn
+	parser    *httpParser
+	data      []byte
+	detached  *bool
+	response  *Response
 }
 
 // Header returns the value of the header name.
@@ -38,22 +37,35 @@ func (r Request) Body() []byte {
 	return r.data
 }
 
+var contentLength = []byte("Content-Length")
+
 // BodyLength returns the length of the request body.
 func (r Request) BodyLength() int64 {
-	return r.parser.ContentLength()
+	return BytesToInt(r.parser.FindHeader(contentLength))
+}
+
+var host = []byte("Host")
+
+// Host returns the request host retrieved from the header parameter "Host"
+func (r Request) Host() string {
+	header := r.parser.FindHeader(host)
+	if header == nil {
+		return ""
+	}
+	return string(header)
 }
 
 // Path returns the request path.
 //
 // To keep this value longer than the request use CopyString.
 func (r Request) Path() string {
-	return *unsafeString(&r.parser.Path)
+	return *unsafeString(&r.parser.path)
 }
 
 // Method returns the request method of the request
 // defined as the constants MethodGet and similar.
 func (r Request) Method() int {
-	return requestMethod(r.parser.Method)
+	return r.parser.method
 }
 
 // HandleBlocking runs this handler outside of the
@@ -80,34 +92,11 @@ func (r Request) HandleBlocking(fn HandlerFunc) {
 	}()
 }
 
-func requestMethod(data []byte) int {
-	switch data[0] {
-	case 'G':
-		return MethodGet
-	case 'P':
-		switch data[1] {
-		case 'O':
-			return MethodPost
-		case 'U':
-			return MethodPut
-		case 'A':
-			return MethodPatch
-		}
-	case 'C':
-		return MethodConnect
-	case 'O':
-		return MethodOptions
-	case 'T':
-		return MethodTrace
-	}
-	return MethodUnkown
-}
-
 // PathSequence returns the nth element of the path.
 //
 // To keep this value longer than the request use CopyBytes.
 func (r Request) PathSequence(n int) []byte {
-	path := r.parser.Path
+	path := r.parser.path
 	start := 1
 	count := 0
 	for start < len(path) {

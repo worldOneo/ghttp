@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/evanphx/wildcat"
 	"github.com/panjf2000/gnet/v2"
 )
 
@@ -19,8 +18,8 @@ var bytePool = sync.Pool{
 }
 
 type httpCodec struct {
-	parser *wildcat.HTTPParser
-	buf    *bytes.Buffer
+	parser          *httpParser
+	buf             *bytes.Buffer
 }
 
 func (hs *httpServer) OnBoot(eng gnet.Engine) (action gnet.Action) {
@@ -30,7 +29,7 @@ func (hs *httpServer) OnBoot(eng gnet.Engine) (action gnet.Action) {
 func (hs *httpServer) OnClose(c gnet.Conn, err error) (action gnet.Action) {
 	hc := c.Context().(*httpCodec)
 	hc.buf.Reset()
-	bytePool.Put(hc.buf)
+	codecPool.Put(hc)
 	return gnet.None
 }
 
@@ -42,8 +41,14 @@ func (hs *httpServer) OnTick() (delay time.Duration, action gnet.Action) {
 	return
 }
 
+var codecPool = sync.Pool{
+	New: func() any {
+		return &httpCodec{parser: NewHTTPParser(), buf: &bytes.Buffer{}}
+	},
+}
+
 func (hs httpServer) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
-	c.SetContext(&httpCodec{parser: wildcat.NewHTTPParser(), buf: bytePool.Get().(*bytes.Buffer)})
+	c.SetContext(codecPool.Get().(*httpCodec))
 	return nil, gnet.None
 }
 
@@ -56,14 +61,14 @@ pipeline:
 		return gnet.Close
 	}
 	headerOffset, err := hc.parser.Parse(data)
-	if err == wildcat.ErrMissingData {
+	if err == ErrIncompleteData {
 		return gnet.None
 	}
 	if err != nil {
 		return gnet.Close
 	}
 
-	bodyLen := int(hc.parser.ContentLength())
+	bodyLen := int(hc.parser.contentLength)
 	if body.Len() < bodyLen {
 		body.Write(data[headerOffset:])
 	}
