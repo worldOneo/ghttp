@@ -2,7 +2,7 @@
 
 | | Fasthttp | ghttp |
 | --- | --- | --- |
-|req/sec| 360k req/sec | 400k req/sec |
+|req/sec| 405k req/sec | 475k req/sec |
 
 These benchmarks were performent on my machine and are nanobencmarks.
 This Project only exists to show the potential of a well tuned server.
